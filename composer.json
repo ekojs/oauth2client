@@ -1,0 +1,23 @@
+{
+    "name": "ekojs/oauth2client",
+    "description": "Oauth2 Client Library",
+    "type": "library",
+    "license": "AGPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Eko Junaidi Salam",
+            "email": "eko_junaidisalam@live.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": ">=7.3",
+        "ekojs/oauth2helper": "^1.1",
+        "guzzlehttp/guzzle": "^7.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "OC\\Library\\": "src/"
+        }
+    }
+}
