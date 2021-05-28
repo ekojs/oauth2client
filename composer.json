@@ -1,6 +1,6 @@
 {
     "name": "ekojs/oauth2client",
-    "description": "Oauth2 Client Library",
+    "description": "Oauth2 PKCE Client Library based on RFC7636",
     "type": "library",
     "license": "AGPL-3.0-or-later",
     "authors": [

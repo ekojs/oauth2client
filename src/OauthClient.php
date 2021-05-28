@@ -1,4 +1,7 @@
 <?php declare(strict_types=1);
+
+namespace OC\Library;
+
 /**
  * Author: Eko Junaidi Salam <eko.junaidi.salam@gmail.com>
  * License: AGPL-3.0-or-later
