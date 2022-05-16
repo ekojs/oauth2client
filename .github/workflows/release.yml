@@ -1,0 +1,71 @@
+name: Release Deployment
+
+on:
+  push:
+    tags:
+      - v**
+  # pull_request:
+  #   branches: [ master ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup PHP with PCOV
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '7.3'
+        ini-values: pcov.directory=src
+        coverage: pcov
+
+    - name: Validate composer.json and composer.lock
+      run: composer validate --strict
+
+    - name: Cache Composer packages
+      id: composer-cache
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-${{ github.repository }}
+
+    - name: Install dependencies
+      run: composer install
+
+    - name: Run test suite
+      run: composer run test
+      
+    - name: Create Release
+      id: create-new-release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: ${{ github.ref }}
+        body: |
+          ## [2.0.0] - 2022-05-16
+
+          ### Add
+          - Add Verify function
+          - Set Custom Client for easy to mock
+          - Unit Test using PHPUnit
+          - Add Code Coverage
+
+          ### Update
+          - Get Authorization
+          - Callback
+          - Refresh Token
+          
+          ### Delete
+          - Cookie Function
+        draft: false
+        prerelease: false

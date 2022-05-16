@@ -10,6 +10,9 @@
         }
     ],
     "minimum-stability": "stable",
+    "scripts": {
+	    "test": "phpunit -c phpunit.xml --testdox"
+    },
     "require": {
         "php": ">=7.3",
         "ekojs/oauth2helper": "^1.1",
@@ -19,5 +22,14 @@
         "psr-4": {
             "OC\\Library\\": "src/"
         }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "OC\\Tests\\": "tests/"
+        }
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5",
+        "php-coveralls/php-coveralls": "^2.5"
     }
 }

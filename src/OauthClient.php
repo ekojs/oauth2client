@@ -17,9 +17,6 @@ class OauthClient {
     protected $client_id;
     protected $client_secret;
     protected $callbackURL;
-    protected $cookieDomain;
-    protected $cookieToken;
-    protected $cookieUrl;
 
     public $client;
     public static $instance;
@@ -40,24 +37,26 @@ class OauthClient {
         return self::$instance;
     }
 
+    public function setClient(Client $client) {
+        $this->client = $client;
+        return $this;
+    }
+
     public function setParameters(array $params){
         $this->authorizeURL = $params["authorizeURL"];
         $this->tokenURL = $params["tokenURL"];
         $this->client_id = $params["client_id"];
         $this->client_secret = $params["client_secret"];
         $this->callbackURL = $params["callbackURL"];
-        $this->cookieDomain = $params["cookieDomain"] ?? null;
-        $this->cookieToken = $params["cookieToken"] ?? null;
-        $this->cookieUrl = $params["cookieUrl"] ?? null;
         return $this;
     }
     
-    public function getAuthorization(){
-        $state = state();
-        list($code_verifier,$code_challenge) = codeChallenge();
-
+    public function getAuthorization(string $scope="sso",?string $state=null,?string $code_verifiers=null): array {
         // Store generated random state and code challenge based on RFC 7636 
         // https://datatracker.ietf.org/doc/html/rfc7636#section-6.1
+        $state = $state ?? state();
+        list($code_verifier,$code_challenge) = codeChallenge($code_verifiers);
+
         $_SESSION['state'] = $state;
         $_SESSION['code_verifier'] = $code_verifier;
         $_SESSION['code_challenge'] = $code_challenge;
@@ -66,37 +65,44 @@ class OauthClient {
             'response_type' => 'code',
             'client_id' => $this->client_id,
             'redirect_uri' => $this->callbackURL,
-            'scope' => 'user',
+            'scope' => $scope,
             'state' => $state,
             'code_challenge' => $code_challenge,
             'code_challenge_method' => 'S256'
         );
         
-        header('Location: '.$this->authorizeURL.'?'.http_build_query($params));
-        die();
+        // header('Location: '.$this->authorizeURL.'?'.http_build_query($params));
+        // die();
+
+        return [
+            "state" => $state,
+            "code_verifier" => $code_verifier,
+            "code_challenge" => $code_challenge,
+            "location" => 'Location: '.$this->authorizeURL.'?'.http_build_query($params)
+        ];
     }
 
-    public function callback($params){
+    public function callback(array $params): array {
         if(!empty($params["error"])){
-            exit($params["error"]);
+            \trigger_error($params["error"], \E_USER_ERROR);
         }
 
         $state = !empty($params['state']) ? $params['state'] : null;
         $code = !empty($params['code']) ? $params['code'] : null;
 
         if(!isset($code,$state)){
-            exit("invalid_request");
+            \trigger_error("invalid_request", \E_USER_ERROR);
         }
 
         $stateSess = !empty($_SESSION['state']) ? $_SESSION['state'] : null;
 
         if(isset($state,$code)){
             if($state != $stateSess){
-                exit("invalid_state");
+                \trigger_error("invalid_state", \E_USER_ERROR);
             }
 
-            if(empty($code)){
-                exit("invalid_code");
+            if(!ctype_xdigit($code)){
+                \trigger_error("invalid_code", \E_USER_ERROR);
             }
             
             $creds = [
@@ -117,7 +123,7 @@ class OauthClient {
                     $token = json_decode($body,true);
 
                     if(!empty($token["error"])){
-                        exit(json_encode($token));
+                        \trigger_error(json_encode($token), \E_USER_ERROR);
                     }
 
                     if(!empty($token["access_token"])){
@@ -127,66 +133,67 @@ class OauthClient {
                         $_SESSION['access_token'] = $token['access_token'];
                         $_SESSION['refresh_token'] = $token['refresh_token'];
                         $_SESSION['scope'] = $token['scope'];
-                        return $this;
+                        return $token;
                     }
                 }
             }catch(\GuzzleHttp\Exception\ClientException $e){
-                exit($e->getResponse()->getReasonPhrase());
+                \trigger_error($e->getResponse()->getReasonPhrase(), \E_USER_ERROR);
             }
-            exit("The user denies the request");
+            \trigger_error("The user denies the request", \E_USER_ERROR);
         }
     }
 
-    public function getCookie(){
-        if(!empty($_COOKIE[$this->cookieToken]) && 'NULL' !== $_COOKIE[$this->cookieToken]){
-            try{
-                $jar = \GuzzleHttp\Cookie\CookieJar::fromArray([$this->cookieToken => $_COOKIE[$this->cookieToken]],$this->cookieDomain);
-                $res = $this->client->get($this->cookieUrl,['cookies' => $jar]);
-                if($res->getStatusCode() == 200){
-                    $body = (string) $res->getBody();
-                    $token = json_decode($body,true);
+    public function refreshToken(string $refresh_token): ?array {
+        $creds = [
+            'grant_type' => 'refresh_token',
+            'client_id' => $this->client_id,
+            'client_secret' => $this->client_secret,
+            'refresh_token' => $refresh_token
+        ];
+
+        try{
+            $res = $this->client->post($this->tokenURL,[
+                "form_params" => $creds
+            ]);
+            if($res->getStatusCode() == 200){
+                $body = (string) $res->getBody();
+                $token = json_decode($body,true);
+
+                if(!empty($token["error"])){
+                    \trigger_error(json_encode($token), \E_USER_ERROR);
+                }
+
+                if(!empty($token["access_token"])){
                     $_SESSION['access_token'] = $token['access_token'];
-                    $_SESSION['refresh_token'] = $token['refresh_token'] ?? null;
-                    $_SESSION['scope'] = $token['scope'] ?? null;
-                    return $this;
+                    $_SESSION['refresh_token'] = $token['refresh_token'];
+                    $_SESSION['scope'] = $token['scope'];
+                    return $token;
                 }
-            }catch(\GuzzleHttp\Exception\ClientException $e){
-                exit($e->getResponse()->getReasonPhrase());
             }
+        }catch(\GuzzleHttp\Exception\ClientException $e){
+            \trigger_error($e->getResponse()->getReasonPhrase(), \E_USER_ERROR);
         }
+        return null;
     }
 
-    public function refreshToken($refresh_token){
-        if(!empty($refresh_token)){
-            $creds = [
-                'grant_type' => 'refresh_token',
-                'client_id' => $this->client_id,
-                'client_secret' => $this->client_secret,
-                'refresh_token' => $refresh_token
-            ];
-    
-            try{
-                $res = $this->client->post($this->tokenURL,[
-                    "form_params" => $creds
-                ]);
-                if($res->getStatusCode() == 200){
-                    $body = (string) $res->getBody();
-                    $token = json_decode($body,true);
-    
-                    if(!empty($token["error"])){
-                        exit(json_encode($token));
-                    }
-    
-                    if(!empty($token["access_token"])){
-                        $_SESSION['access_token'] = $token['access_token'];
-                        $_SESSION['refresh_token'] = $token['refresh_token'];
-                        $_SESSION['scope'] = $token['scope'];
-                        return $this;
-                    }
+    public function verify(string $token): bool{
+        try{
+            $res = $this->client->get(API_ENDPOINT."/oauth/verify",[
+                "headers" => ["x-api-key" => $token]
+            ]);
+            if($res->getStatusCode() == 200){
+                $body = (string) $res->getBody();
+                $status = json_decode($body,true);
+
+                if(!empty($status["error"])){
+                    \trigger_error(json_encode($status), \E_USER_ERROR);
                 }
-            }catch(\GuzzleHttp\Exception\ClientException $e){
-                exit($e->getResponse()->getReasonPhrase());
+
+                return $status["status"];
             }
+        }catch(\GuzzleHttp\Exception\ClientException $e){
+            \trigger_error($e->getResponse()->getReasonPhrase(), \E_USER_ERROR);
         }
+        return false;
     }
 }
