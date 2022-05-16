@@ -23,7 +23,9 @@ class OauthClientTest extends TestCase {
     protected function setUp(): void
     {
         parent::setUp();
-        define("API_ENDPOINT","https://dev.api.com");
+        if (!defined("API_ENDPOINT")) {
+            define("API_ENDPOINT","https://dev.api.com");
+        }
         $this->params = [
             "authorizeURL" => "https://dev.api.com/authorize",
             "tokenURL" => "https://dev.api.com/oauth/token",
