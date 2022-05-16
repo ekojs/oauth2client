@@ -95,6 +95,7 @@ class OauthClientTest extends TestCase {
     public function testCallbackUserDeniesRequest(): void 
     {
         $_SESSION["state"] = "12345";
+        $_SESSION['code_verifier'] = $this->codeVerifier;
         $this->expectError();
         $this->expectErrorMessageMatches("/The user denies the request/");
 
@@ -118,6 +119,7 @@ class OauthClientTest extends TestCase {
     public function testCallbackException(): void 
     {
         $_SESSION["state"] = "12345";
+        $_SESSION['code_verifier'] = $this->codeVerifier;
         $this->expectError();
         $this->expectErrorMessageMatches("/Unauthorized/");
 
@@ -141,6 +143,7 @@ class OauthClientTest extends TestCase {
     public function testCallbackTokenError(): void 
     {
         $_SESSION["state"] = "12345";
+        $_SESSION['code_verifier'] = $this->codeVerifier;
         $this->expectError();
         $this->expectErrorMessageMatches("/something error/");
 
